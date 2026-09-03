@@ -52,8 +52,17 @@ public class SecurityConfig {
                             .hasAnyRole("LOGISTICS_OPERATOR", "ADMINISTRATOR")
 
                     // Proof of delivery
-                    .requestMatchers(HttpMethod.POST, "/api/pod/**")
+                    .requestMatchers(HttpMethod.POST, "/api/pod/*")
                             .hasRole("LOGISTICS_OPERATOR")
+
+                    .requestMatchers(HttpMethod.GET, "/api/pod/pending")
+                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
+
+                    .requestMatchers(HttpMethod.GET, "/api/pod/*")
+                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
+
+                    .requestMatchers(HttpMethod.PATCH, "/api/pod/*/verify")
+                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
 
                     // Analytics and reports
                     .requestMatchers("/api/analytics/**", "/api/reports/**")
