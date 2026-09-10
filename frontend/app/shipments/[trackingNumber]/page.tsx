@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import RouteHistory from "./RouteHistory";
 
 type Shipment = {
   id: number;
@@ -197,6 +198,10 @@ export default function ShipmentDetailsPage() {
             </div>
 
           </div>
+        </div>
+
+        <div className="mt-6">
+          <RouteHistory shipmentId={shipment.id} />
         </div>
       </div>
     </main>

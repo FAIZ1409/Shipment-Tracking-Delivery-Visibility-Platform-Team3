@@ -1,88 +1,110 @@
 package com.shiptrack.shiptrack_pro.config;
- 
+
 import com.shiptrack.shiptrack_pro.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
- 
+
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity   // activates @PreAuthorize on controller methods
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
- 
+
     private final JwtAuthFilter jwtAuthFilter;
- 
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
+        http.csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
 
-        http
-            .csrf(csrf -> csrf.disable())
+                        .requestMatchers(HttpMethod.POST, "/api/shipments")
+                        .hasAnyRole("CUSTOMER", "BUSINESS_CLIENT")
 
-            .sessionManagement(session ->
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        // Route history is readable by the owning CUSTOMER/BUSINESS_CLIENT
+                        // too (ownership is checked in RouteHistoryServiceImpl), so this
+                        // specific path must be matched before the staff-only rule below.
+                        .requestMatchers(HttpMethod.GET, "/api/routes/*/history")
+                        .authenticated()
 
-            .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/tracking/**", "/api/routes/**")
+                        .hasAnyRole("LOGISTICS_OPERATOR", "ADMINISTRATOR")
 
-                    // Public authentication endpoints
-                    .requestMatchers("/api/auth/**").permitAll()
+                        // =========================
+                        // Proof of Delivery
+                        // =========================
+                        .requestMatchers(HttpMethod.POST, "/api/pod/*")
+                        .hasRole("LOGISTICS_OPERATOR")
 
-                    // Public WebSocket handshake
-                    .requestMatchers("/api/ws/tracking/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/pod/pending")
+                        .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
 
-                    // Shipment creation
-                    .requestMatchers(HttpMethod.POST, "/api/shipments")
-                            .hasAnyRole("CUSTOMER", "BUSINESS_CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/pod/*")
+                        .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
 
-                    // Tracking and routes
-                    .requestMatchers("/api/tracking/**", "/api/routes/**")
-                            .hasAnyRole("LOGISTICS_OPERATOR", "ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/pod/*/verify")
+                        .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
 
-                    // Proof of delivery
-                    .requestMatchers(HttpMethod.POST, "/api/pod/*")
-                            .hasRole("LOGISTICS_OPERATOR")
+                        // =========================
+                        // Driver Location
+                        // =========================
+                        .requestMatchers("/api/route/**")
+                        .hasAnyRole("LOGISTICS_OPERATOR", "ADMINISTRATOR")
 
-                    .requestMatchers(HttpMethod.GET, "/api/pod/pending")
-                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
+                        // =========================
+                        // ETA Prediction
+                        // =========================
+                        .requestMatchers("/api/eta/**")
+                        .authenticated()
 
-                    .requestMatchers(HttpMethod.GET, "/api/pod/*")
-                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
+                        // =========================
+                        // Analytics & Reports
+                        // Per-role restriction (CUSTOMER / BUSINESS_CLIENT /
+                        // ADMINISTRATOR) is enforced with @PreAuthorize on
+                        // each individual endpoint in the controllers, since
+                        // each role hits a different path under these prefixes.
+                        // =========================
+                        .requestMatchers("/api/analytics/**", "/api/reports/**")
+                        .authenticated()
 
-                    .requestMatchers(HttpMethod.PATCH, "/api/pod/*/verify")
-                            .hasAnyRole("SUPPORT_AGENT", "ADMINISTRATOR")
+                        // =========================
+                        // Admin
+                        // =========================
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMINISTRATOR")
 
-                    // Analytics and reports
-                    .requestMatchers("/api/analytics/**", "/api/reports/**")
-                            .hasAnyRole("BUSINESS_CLIENT", "ADMINISTRATOR")
-
-                    // Admin
-                    .requestMatchers("/api/admin/**")
-                            .hasRole("ADMINISTRATOR")
-
-                    // Everything else requires authentication
-                    .anyRequest().authenticated()
-            )
-
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
-
-            .addFilterBefore(
-                    jwtAuthFilter,
-                    UsernamePasswordAuthenticationFilter.class
-            );
+                        // =========================
+                        // Everything else
+                        // =========================
+                        .anyRequest()
+                        .authenticated()
+                )
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .addFilterBefore(
+                        jwtAuthFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
     }

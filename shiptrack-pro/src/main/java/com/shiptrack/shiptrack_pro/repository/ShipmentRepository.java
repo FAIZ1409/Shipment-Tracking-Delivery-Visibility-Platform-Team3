@@ -13,6 +13,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
 
     List<Shipment> findByCustomer(User customer);
 
+    List<Shipment> findByStatus(String status);
+
+    long countByStatus(String status);
+
+    long countByCustomer(User customer);
+
     Optional<Shipment> findByTrackingNumberAndCustomer(
             String trackingNumber,
             User customer

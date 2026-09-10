@@ -2,6 +2,9 @@ package com.shiptrack.shiptrack_pro.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "routes")
@@ -45,4 +48,11 @@ public class Route {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "driver_id")
     private User driver;
+
+    // When this route record was created - used by Route History on the
+    // shipment detail page. Added additively; existing Route.builder()
+    // callers are unaffected since Hibernate populates this automatically.
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }
